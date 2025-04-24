@@ -8,94 +8,140 @@ use Illuminate\Support\Facades\Http;
 class WeatherController extends Controller
 {
     /**
-     * Get current weather details for a given city.
+     * Get current weather details for a given city OR coordinates.
      */
     public function current(Request $request)
     {
-        // Get the city and units from query parameters (default units: metric)
+        $lat = $request->query('lat');
+        $lon = $request->query('lon');
         $city = $request->query('city');
         $units = $request->query('units', 'metric'); // 'metric' or 'imperial'
 
-        // Geocode city to get latitude and longitude
-        $geoData = Http::get("http://api.openweathermap.org/geo/1.0/direct", [
-            'q' => $city,
-            'limit' => 1,
-            'appid' => env('OPENWEATHER_API_KEY')
-        ])->json();
+        $weatherData = null;
+        $locationData = null;
 
-        // Return error if city not found
-        if (empty($geoData)) {
-            return response()->json(['error' => 'City not found'], 404);
+        if ($city) {
+            // Geocode city to get latitude and longitude
+            $geoData = Http::get("http://api.openweathermap.org/geo/1.0/direct", [
+                'q' => $city,
+                'limit' => 1,
+                'appid' => env('OPENWEATHER_API_KEY')
+            ])->json();
+
+            if (empty($geoData)) {
+                return response()->json(['error' => 'City not found'], 404);
+            }
+
+            $lat = $geoData[0]['lat'];
+            $lon = $geoData[0]['lon'];
+            $locationData = $geoData[0];
+        } elseif ($lat && $lon) {
+            // Get location details from coordinates (reverse geocoding)
+            $reverseGeoData = Http::get("http://api.openweathermap.org/geo/1.0/reverse", [
+                'lat' => $lat,
+                'lon' => $lon,
+                'limit' => 1,
+                'appid' => env('OPENWEATHER_API_KEY')
+            ])->json();
+
+            if (!empty($reverseGeoData)) {
+                $locationData = $reverseGeoData[0];
+            }
+        } else {
+            return response()->json(['error' => 'Please provide either a city name or latitude and longitude'], 400);
         }
 
-        $lat = $geoData[0]['lat'];
-        $lon = $geoData[0]['lon'];
+        if ($lat && $lon) {
+            // Fetch current weather data using coordinates
+            $weather = Http::get("https://api.openweathermap.org/data/2.5/weather", [
+                'lat' => $lat,
+                'lon' => $lon,
+                'appid' => env('OPENWEATHER_API_KEY'),
+                'units' => $units
+            ])->json();
 
-        // Fetch current weather data using coordinates
-        $weather = Http::get("https://api.openweathermap.org/data/2.5/weather", [
-            'lat' => $lat,
-            'lon' => $lon,
-            'appid' => env('OPENWEATHER_API_KEY'),
-            'units' => $units
-        ])->json();
+            if (!empty($weather)) {
+                $weatherData = $weather;
+            } else {
+                return response()->json(['error' => 'Could not fetch weather data for the provided coordinates'], 500);
+            }
+        }
 
-        // Format and return the weather response
-        return response()->json([
-            'location' => $geoData[0]['name'],
-            'country' => $geoData[0]['country'],
-            'temp' => $weather['main']['temp'],
-            'description' => $weather['weather'][0]['description'],
-            'icon' => $weather['weather'][0]['icon'],
-            'humidity' => $weather['main']['humidity'],
-            'wind_speed' => $weather['wind']['speed'],
-            'date' => now()->toDateString()
-        ]);
+        if ($weatherData && $locationData) {
+            return response()->json([
+                'location' => $locationData['name'] ?? null,
+                'country' => $locationData['country'] ?? null,
+                'temp' => $weatherData['main']['temp'],
+                'description' => $weatherData['weather'][0]['description'],
+                'icon' => $weatherData['weather'][0]['icon'],
+                'humidity' => $weatherData['main']['humidity'],
+                'wind_speed' => $weatherData['wind']['speed'],
+                'date' => now()->toDateString()
+            ]);
+        } else {
+            return response()->json(['error' => 'Could not retrieve weather information'], 500);
+        }
     }
 
     /**
-     * Get a 3-day weather forecast for a given city.
+     * Get a 3-day weather forecast for a given city OR coordinates.
      */
     public function forecast(Request $request)
     {
-        // Get the city and units from query parameters
+        $lat = $request->query('lat');
+        $lon = $request->query('lon');
         $city = $request->query('city');
         $units = $request->query('units', 'metric');
 
-        // Geocode the city
-        $geoData = Http::get("http://api.openweathermap.org/geo/1.0/direct", [
-            'q' => $city,
-            'limit' => 1,
-            'appid' => env('OPENWEATHER_API_KEY')
-        ])->json();
+        $forecastData = null;
 
-        // Return error if city not found
-        if (empty($geoData)) {
-            return response()->json(['error' => 'City not found'], 404);
+        if ($city) {
+            // Geocode the city
+            $geoData = Http::get("http://api.openweathermap.org/geo/1.0/direct", [
+                'q' => $city,
+                'limit' => 1,
+                'appid' => env('OPENWEATHER_API_KEY')
+            ])->json();
+
+            if (empty($geoData)) {
+                return response()->json(['error' => 'City not found'], 404);
+            }
+
+            $lat = $geoData[0]['lat'];
+            $lon = $geoData[0]['lon'];
+        } elseif (!$lat || !$lon) {
+            return response()->json(['error' => 'Please provide either a city name or latitude and longitude'], 400);
         }
 
-        $lat = $geoData[0]['lat'];
-        $lon = $geoData[0]['lon'];
+        if ($lat && $lon) {
+            // Fetch 5-day forecast data in 3-hour intervals
+            $forecast = Http::get("https://api.openweathermap.org/data/2.5/forecast", [
+                'lat' => $lat,
+                'lon' => $lon,
+                'appid' => env('OPENWEATHER_API_KEY'),
+                'units' => $units
+            ])->json();
 
-        // Fetch 5-day forecast data in 3-hour intervals
-        $forecast = Http::get("https://api.openweathermap.org/data/2.5/forecast", [
-            'lat' => $lat,
-            'lon' => $lon,
-            'appid' => env('OPENWEATHER_API_KEY'),
-            'units' => $units
-        ])->json();
+            if (!empty($forecast) && isset($forecast['list'])) {
+                $daily = collect($forecast['list'])->take(24)->map(function ($item) {
+                    return [
+                        'date' => $item['dt_txt'],
+                        'temp' => $item['main']['temp'],
+                        'description' => $item['weather'][0]['description'],
+                        'icon' => $item['weather'][0]['icon'],
+                    ];
+                });
+                $forecastData = $daily->chunk(8)->take(3);
+            } else {
+                return response()->json(['error' => 'Could not fetch forecast data for the provided coordinates'], 500);
+            }
+        }
 
-        // Take the first 24 intervals (3-hour steps = 3 days), group into 3 days
-        $daily = collect($forecast['list'])->take(24)->map(function ($item) {
-            return [
-                'date' => $item['dt_txt'],
-                'temp' => $item['main']['temp'],
-                'description' => $item['weather'][0]['description'],
-                'icon' => $item['weather'][0]['icon'],
-            ];
-        });
-
-        // Return 3 daily chunks (8 intervals = 1 day)
-        return response()->json($daily->chunk(8)->take(3));
+        if ($forecastData) {
+            return response()->json($forecastData);
+        } else {
+            return response()->json(['error' => 'Could not retrieve forecast information'], 500);
+        }
     }
 
     /**
@@ -127,4 +173,3 @@ class WeatherController extends Controller
         ]);
     }
 }
-
