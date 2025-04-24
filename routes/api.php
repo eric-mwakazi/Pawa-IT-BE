@@ -7,8 +7,10 @@ Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
 
+Route::prefix('weather')->controller(WeatherController::class)->group(function () {
+    Route::get('/current', 'current');
+    Route::get('/forecast', 'forecast');
+    Route::get('/geocode', 'geocodeCity');
+});
 
-Route::get('/weather/current', [WeatherController::class, 'current']);
-Route::get('/weather/forecast', [WeatherController::class, 'forecast']);
-Route::get('/weather/geocode', [WeatherController::class, 'geocodeCity']);
 
