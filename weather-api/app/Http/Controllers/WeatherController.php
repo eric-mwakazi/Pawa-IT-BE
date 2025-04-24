@@ -69,6 +69,17 @@ class WeatherController extends Controller
             'units' => $units
         ])->json();
 
+        // Group data into next 3 days (simple logic)
+        $daily = collect($forecast['list'])->take(24)->map(function ($item) {
+            return [
+                'date' => $item['dt_txt'],
+                'temp' => $item['main']['temp'],
+                'description' => $item['weather'][0]['description'],
+                'icon' => $item['weather'][0]['icon'],
+            ];
+        });
+
+        return response()->json($daily->chunk(8)->take(3));
+    }
 }
 
-}
