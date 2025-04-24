@@ -154,7 +154,7 @@ MIT License. See `LICENSE` for more information.
 ## 🙋🏽‍♂️ Author
 
 **Eric Mwakazi**  
-[LinkedIn](https://linkedin.com/in/ericmwakazi) • [GitHub](https://github.com/your-username)
+[LinkedIn](https://linkedin.com/in/eric-mwakazi) • [GitHub](https://github.com/eric-mwakazi)
 
 ---
 
