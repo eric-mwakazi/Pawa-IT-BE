@@ -81,5 +81,6 @@ class WeatherController extends Controller
 
         return response()->json($daily->chunk(8)->take(3));
     }
+
 }
 
