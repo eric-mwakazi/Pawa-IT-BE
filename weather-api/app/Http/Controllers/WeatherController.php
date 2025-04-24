@@ -82,5 +82,27 @@ class WeatherController extends Controller
         return response()->json($daily->chunk(8)->take(3));
     }
 
+    public function geocodeCity(Request $request)
+{
+    $city = $request->query('city');
+
+    $geoData = Http::get("http://api.openweathermap.org/geo/1.0/direct", [
+        'q' => $city,
+        'limit' => 1,
+        'appid' => env('OPENWEATHER_API_KEY')
+    ])->json();
+
+    if (empty($geoData)) {
+        return response()->json(['error' => 'City not found'], 404);
+    }
+
+    return response()->json([
+        'city' => $geoData[0]['name'],
+        'country' => $geoData[0]['country'],
+        'lat' => $geoData[0]['lat'],
+        'lon' => $geoData[0]['lon']
+    ]);
+}
+
 }
 
